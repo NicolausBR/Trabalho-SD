@@ -75,6 +75,22 @@ O processo de eleição segue uma variação do **Algoritmo do Eleitor Bully (Bu
 3. Se o nó **não receber nenhuma resposta** dentro de um tempo limite, ele **se declara coordenador** e envia `NOVO_COORDENADOR`.
 4. Todos os nós **atualizam o novo coordenador** e voltam ao estado normal de operação.
 
----
+
+## Iniciando o Projeto
+
+O projeto utiliza um **ambiente virtual (venv)** para as bibliotecas, portanto **não há necessidade de instalação manual**.
+
+Para iniciar o ambiente virtual, utilize um dos comandos abaixo:
+
+### Linux
+```bash
+source sd/bin/activate
+```
+
+### Windons
+```bash
+sd\Scripts\activate
+```
+
 
 

@@ -4,6 +4,7 @@ import random
 import sys
 import time
 import socket
+import ipaddress
 
 # Bibliotecas prompt_toolkit para interface amigável no terminal
 from prompt_toolkit import PromptSession, print_formatted_text, HTML
@@ -12,7 +13,7 @@ from prompt_toolkit.styles import Style
 
 # Configurações do multicast
 MULTICAST_GROUP = '224.1.1.1'
-PORT = 5007
+PORT = 5000
 
 #Configurações de coordenador
 COORDENADOR = None
@@ -60,7 +61,7 @@ def ouvir_multicast():
     global COORDENADOR
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(('', PORT))
+    sock.bind((MULTICAST_GROUP, PORT))
 
     group = socket.inet_aton(MULTICAST_GROUP)
     interface = socket.inet_aton('0.0.0.0')
@@ -325,17 +326,30 @@ def eleger_coordenador(sock, timeout=3.0):
     enviar_mensagem("NOVO_COORDENADOR", sock, "")
     enviar_mensagem("BATIMENTO", sock, "")
     LISTA_NOS.append((NODE_ID, NODE_NAME))
-    
+
     # marcar fim da eleição e limpar respostas
     with election_lock:
         eleicao_em_andamento = False
         respostas_eleicao.clear()
 
+# --- Função para validar endereço IP multicast ---
+def validar_ip_multicast(ip_str):
+    try:
+        ip = ipaddress.IPv4Address(ip_str)
+        # Verifica se está na faixa de endereços multicast (224.0.0.0 – 239.255.255.255)
+        if ip.is_multicast:
+            return True
+        else:
+            print(f"Endereço {ip_str} não é multicast! Usando o padrão 224.1.1.200.")
+            return False
+    except ipaddress.AddressValueError:
+        print(f"Endereço {ip_str} inválido! Usando o padrão 224.1.1.200.")
+        return False
+    
 # --- Função principal ---
 def chat():
     try:
-        global NODE_NAME, NODE_COLOR
-        print(f"Nó {NODE_ID} iniciado.\n")
+        global NODE_NAME, NODE_COLOR, MULTICAST_GROUP
 
         NODE_NAME = input("Digite seu nome: ")
         print_formatted_text(HTML(f"Cores disponíveis: {texto_colorido}"))
@@ -345,6 +359,10 @@ def chat():
             print("Cor inválida! Usando branco como padrão.")
             NODE_COLOR = "branco"
         NODE_COLOR = cores_disponiveis[NODE_COLOR]
+        
+        MULTICAST_GROUP = input("Digite o endereço multicast (padrão '224.1.1.1'): ") or '224.1.1.1'
+        if not validar_ip_multicast(MULTICAST_GROUP):
+            MULTICAST_GROUP = '224.1.1.1'
 
         t_listen = threading.Thread(target=ouvir_multicast, daemon=True)
         t_send = threading.Thread(target=enviar_multicast, daemon=True)
@@ -360,7 +378,14 @@ def chat():
         with patch_stdout():
             print_formatted_text(HTML("<ansibrightgreen>Programa finalizado com segurança.</ansibrightgreen>"))
         sys.exit(0)
-      
+    
+    except Exception as e:
+        print(f"Erro inesperado: {e}")
+        stop_event.set()
+        with patch_stdout():
+            print_formatted_text(HTML("<ansibrightgreen>Programa finalizado com segurança.</ansibrightgreen>"))
+        sys.exit(1)
+
     except KeyboardInterrupt:
         print(f"\nEncerrando o Chat via KeyboardInterrupt...")
         stop_event.set()
