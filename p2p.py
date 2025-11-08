@@ -44,18 +44,19 @@ cores_disponiveis = {
     "preto": "ansibrightblack",
     "vermelho": "ansibrightred",
     "verde": "ansibrightgreen",
-    "amarelo": "ansibrightyellow",
+    "laranja": "ansibrightyellow",
     "azul": "ansibrightblue",
     "magenta": "ansibrightmagenta",
     "ciano": "ansibrightcyan",
-    "branco": "ansiwhite"
+    "branco": "ansiwhite",
+    "amarelo": "ansiyellow"
 }
 
 itens_coloridos = [f'<{cores_disponiveis[c]}>{c}</{cores_disponiveis[c]}>' for c in cores_disponiveis]
 texto_colorido = ", ".join(itens_coloridos)
 
 # --- Função que escuta as mensagens multicast ---
-def listen_multicast():
+def ouvir_multicast():
     global COORDENADOR
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -75,7 +76,7 @@ def listen_multicast():
     sock.settimeout(1.0)
 
     # Inicia thread para monitorar batimentos do coordenador
-    threading.Thread(target=monitor_coordenador, args=(sock,), daemon=True).start()
+    threading.Thread(target=monitorar_coordenador, args=(sock,), daemon=True).start()
 
     while not stop_event.is_set():
         try:
@@ -89,14 +90,14 @@ def listen_multicast():
     sock.close()
 
 # --- Função que envia mensagens multicast ---
-def send_multicast():
+def enviar_multicast():
     try:
       node_ready.wait()
       sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
       ttl = struct.pack('b', 1)
       sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
-      print('Digite a mensagem (ou "sair" para encerrar)')
+      print('Digite a mensagem ("sair" para encerrar, "lista" para ver nós conectados caso seja coordenador):')
       while not stop_event.is_set():
             with patch_stdout():
               message = session.prompt("> ")
@@ -127,9 +128,8 @@ def send_multicast():
         stop_event.set()
 
 # --- Função para monitorar batimentos do coordenador ---
-def monitor_coordenador(sock):
+def monitorar_coordenador(sock):
     global ULTIMO_BATIMENTO, COORDENADOR
-    print(f"[DEBUG] ULTIMO_BATIMENTO={ULTIMO_BATIMENTO:.3f}, agora={time.time():.3f}, COORD_ID={COORDENADOR[0]}, COORDENADOR={COORDENADOR}")
    
     iniciado_em = time.time()
     while not stop_event.is_set():
@@ -140,7 +140,7 @@ def monitor_coordenador(sock):
             continue
 
         time.sleep(0.5)
-        # Se eu não for coordenador e tempo desde último batimento for maior que limite => inicia eleição
+        # Se eu for o coordenador eu apenas mando o batimento
         if COORDENADOR[0] == NODE_ID:
             enviar_mensagem("BATIMENTO", sock, "")
             continue
@@ -186,7 +186,7 @@ def tratar_mensagem(msg, sock):
         
         elif tipo == "NOVO_NO" and (id_no != NODE_ID):
             with patch_stdout():
-                print_formatted_text(HTML(f"Novo nó adicionado ao grupo: <{cor}>{nome_no}</{cor}> (ID: {id_no})"))
+                print_formatted_text(HTML(f"<{cor}>{nome_no}</{cor}> (ID: {id_no}) entrou no grupo!"))
             return
         
         elif tipo == "ELEICAO":
@@ -200,20 +200,23 @@ def tratar_mensagem(msg, sock):
                 respostas_eleicao.append((int(id_no), nome_no))
             return
         
-        
         elif tipo == "NOVO_COORDENADOR":
             COORDENADOR = (no_id, nome_no)
             ULTIMO_BATIMENTO = time.time()
+            enviar_mensagem("NOVA_LISTA", sock, "")
             with election_lock:
                 eleicao_em_andamento = False
                 respostas_eleicao.clear()
             with patch_stdout():
                 print_formatted_text(HTML(f"<ansibrightgreen>Novo coordenador: {nome_no} (ID: {no_id})</ansibrightgreen>"))
             return
-
-    
+        
         elif tipo == "BATIMENTO":
             ULTIMO_BATIMENTO = time.time()
+            return
+        
+        elif tipo == "NOVA_LISTA" and (COORDENADOR and COORDENADOR[0] == NODE_ID):
+            LISTA_NOS.append((no_id, nome_no))
             return
         
         elif tipo == "SAIR":
@@ -321,7 +324,8 @@ def eleger_coordenador(sock, timeout=3.0):
     # anuncia novo coordenador para toda a rede
     enviar_mensagem("NOVO_COORDENADOR", sock, "")
     enviar_mensagem("BATIMENTO", sock, "")
-    LISTA_NOS = respostas_eleicao + [(NODE_ID, NODE_NAME)]
+    LISTA_NOS.append((NODE_ID, NODE_NAME))
+    
     # marcar fim da eleição e limpar respostas
     with election_lock:
         eleicao_em_andamento = False
@@ -342,23 +346,26 @@ def chat():
             NODE_COLOR = "branco"
         NODE_COLOR = cores_disponiveis[NODE_COLOR]
 
-        t_listen = threading.Thread(target=listen_multicast, daemon=True)
-        t_send = threading.Thread(target=send_multicast, daemon=True)
+        t_listen = threading.Thread(target=ouvir_multicast, daemon=True)
+        t_send = threading.Thread(target=enviar_multicast, daemon=True)
         t_listen.start()
         t_send.start()
 
         while not stop_event.is_set():
             time.sleep(0.5)
 
-        print("⏹ Encerrando todas as threads...")
+        print("Encerrando todas as threads...")
         t_listen.join(timeout=2)
         t_send.join(timeout=2)
-        print("✅ Programa finalizado com segurança.")
+        with patch_stdout():
+            print_formatted_text(HTML("<ansibrightgreen>Programa finalizado com segurança.</ansibrightgreen>"))
         sys.exit(0)
       
     except KeyboardInterrupt:
-        print(f"\n⏹ Encerrando o Chat via KeyboardInterrupt...")
+        print(f"\nEncerrando o Chat via KeyboardInterrupt...")
         stop_event.set()
+        with patch_stdout():
+            print_formatted_text(HTML("<ansibrightgreen>Programa finalizado com segurança.</ansibrightgreen>"))
         sys.exit(0)
 
 if __name__ == "__main__":
