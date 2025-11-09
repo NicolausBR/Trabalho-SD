@@ -1,5 +1,5 @@
 # Trabalho Final - Sistemas Distribuídos 2025/2
-### By Nicolas Pereira Ribeiro
+### By Nicolas Pereira Ribeiro - https://github.com/NicolausBR/Trabalho-SD
 
 ## Tema
 Implementação de um **Chat P2P (Peer-to-Peer)** com **eleição de coordenador** e **comunicação via multicast**. O sistema de mensagens instantâneas distribuído **(sem servidor central)**
