@@ -49,8 +49,7 @@ cores_disponiveis = {
     "azul": "ansibrightblue",
     "magenta": "ansibrightmagenta",
     "ciano": "ansibrightcyan",
-    "branco": "ansiwhite",
-    "amarelo": "ansiyellow"
+    "branco": "ansiwhite"
 }
 
 itens_coloridos = [f'<{cores_disponiveis[c]}>{c}</{cores_disponiveis[c]}>' for c in cores_disponiveis]
@@ -172,14 +171,13 @@ def tratar_mensagem(msg, sock):
 
         if no_id == NODE_ID:
             return
-
         if tipo == "BUSCA_COORDENADOR" and (COORDENADOR and COORDENADOR[0] == NODE_ID):
             while True:
                 novo_id = random.randint(2, 10000)
                 if all(n[0] != novo_id for n in LISTA_NOS) and novo_id != NODE_ID:
                     break
 
-            resposta = f"ADD_NO:{NODE_ID}:{NODE_NAME}:{cor}:{novo_id}:"
+            resposta = f"ADD_NO:{NODE_ID}:{NODE_NAME}:{cor}:{novo_id},{no_id}:"
             LISTA_NOS.append((novo_id, nome_no))
             sock.sendto(resposta.encode('utf-8'), (MULTICAST_GROUP, PORT))
 
@@ -248,33 +246,49 @@ def tratar_mensagem(msg, sock):
 # Buscar coordenador existente
 def buscar_coordenador(sock):
     global COORDENADOR, NODE_ID, ULTIMO_BATIMENTO, LISTA_NOS
+    id_temporario = random.randint(10001, 20000)
 
-    print("Buscando coordenador do Chat...")
-    mensagem = f"BUSCA_COORDENADOR:0:{NODE_NAME}:{NODE_COLOR}:"
-    sock.sendto(mensagem.encode('utf-8'), (MULTICAST_GROUP, PORT))
-    sock.settimeout(3)
+    def enviar_busca():
+        mensagem = f"BUSCA_COORDENADOR:{id_temporario}:{NODE_NAME}:{NODE_COLOR}:"
+        sock.sendto(mensagem.encode('utf-8'), (MULTICAST_GROUP, PORT))
+
+    with patch_stdout():
+        print_formatted_text(HTML("<ansiyellow>Buscando coordenador do Chat...</ansiyellow>"))
+    enviar_busca()
+
+    sock.settimeout(random.uniform(1.0, 3.0))
 
     try:
         while True:
             data, addr = sock.recvfrom(1024)
             msg = data.decode('utf-8')
 
+            if msg.startswith("BATIMENTO"):
+                enviar_busca()
+                continue
+
             # Se alguém responder que é o coordenador
             if msg.startswith("ADD_NO"):
-                id_coord = msg.split(":")[1]
-                nome_coord = msg.split(":")[2]
-                meu_id = msg.split(":")[4]
-                with patch_stdout():
-                    print_formatted_text(HTML(f"<ansibrightgreen>Coordenador encontrado:</ansibrightgreen> {nome_coord} (ID: {id_coord})"))
-                    print_formatted_text(HTML(f"<ansibrightred>ID recebido do coordenador:</ansibrightred> {meu_id}"))
-                COORDENADOR = (int(id_coord), nome_coord)
-                NODE_ID = int(meu_id)
-                ULTIMO_BATIMENTO = time.time()
-                enviar_mensagem("NOVO_NO", sock)
-                return
+                partes = msg.split(":")
+                if len(partes) >= 6:
+                    ids = partes[4].split(",")
+                    if len(ids) == 2 and ids[1] == str(id_temporario):
+                        id_coord = partes[1]
+                        nome_coord = partes[2]
+                        meu_id = ids[0]
+                        with patch_stdout():
+                            print_formatted_text(HTML(f"<ansibrightgreen>Coordenador encontrado:</ansibrightgreen> {nome_coord} (ID: {id_coord})"))
+                            print_formatted_text(HTML(f"<ansibrightred>ID recebido do coordenador:</ansibrightred> {meu_id}"))
+                        COORDENADOR = (int(id_coord), nome_coord)
+                        NODE_ID = int(meu_id)
+                        ULTIMO_BATIMENTO = time.time()
+                        enviar_mensagem("NOVO_NO", sock)
+                        return
             
     except socket.timeout:
         # Se ninguém respondeu, este nó assume a liderança
+        with patch_stdout():
+            print_formatted_text(HTML("<ansibrightgreen>Nenhum coordenador encontrado. Assumindo liderança...</ansibrightgreen>"))
         NODE_ID = 1
         COORDENADOR = (NODE_ID, NODE_NAME)
         LISTA_NOS.append((NODE_ID, NODE_NAME))

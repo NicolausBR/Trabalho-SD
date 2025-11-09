@@ -1,4 +1,5 @@
 # Trabalho Final - Sistemas Distribuídos 2025/2
+### By Nicolas Pereira Ribeiro
 
 ## Tema
 Implementação de um **Chat P2P (Peer-to-Peer)** com **eleição de coordenador** e **comunicação via multicast**. O sistema de mensagens instantâneas distribuído **(sem servidor central)**
@@ -17,6 +18,7 @@ Os nós funcionam a partir de 4 threads para uma execução assíncrona, podendo
 - **`enviar_multicast`**: Responsável por enviar as mensagens na rede multicast, que agurada o nó terminar a configuração de listen para ser executada;
 - **`monitorar_coordenador`**: Responsável por enviar e receber as mensagens de "HEARTBEAT" do coordenador, inciando a thread de eleição caso esse sinal não seja recebido;
 - **`eleger_coordenador`**: Instanciada para controlar o fluxo do processo de eleição, a fim de evitar que várias eleições ocorram ao mesmo tempo.
+
 
 ## Mensagens
 
@@ -80,16 +82,19 @@ O processo de eleição segue uma variação do **Algoritmo do Eleitor Bully (Bu
 
 O projeto utiliza um **ambiente virtual (venv)** para as bibliotecas, portanto **não há necessidade de instalação manual**.
 
-Para iniciar o ambiente virtual, utilize um dos comandos abaixo:
+Para iniciar o ambiente virtual e o projeto, utilize um dos comandos abaixo:
 
 ### Linux
 ```bash
 source sd/bin/activate
+python3 p2p.py
 ```
+
 
 ### Windons
 ```bash
 sd\Scripts\activate
+python3 p2p.py
 ```
 
 
