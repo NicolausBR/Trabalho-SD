@@ -77,6 +77,12 @@ O processo de eleição segue uma variação do **Algoritmo do Eleitor Bully (Bu
 3. Se o nó **não receber nenhuma resposta** dentro de um tempo limite, ele **se declara coordenador** e envia `NOVO_COORDENADOR`.
 4. Todos os nós **atualizam o novo coordenador** e voltam ao estado normal de operação.
 
+## Log de Mensagens
+
+O chat possui um sistema de **log** que registra as mensagens trocadas entre os nós, **com exceção** das mensagens dos tipos `BATIMENTO` e `NOVA_LISTA`, a fim de evitar que o log se torne excessivamente grande e complexo.
+
+Além disso, apenas o **coordenador** é responsável por registrar as mensagens no log, **exceto** durante o processo de **eleição**, quando todos os nós participantes podem registrar eventos relevantes.
+
 
 ## Iniciando o Projeto
 
