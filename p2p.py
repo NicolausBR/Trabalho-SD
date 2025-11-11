@@ -5,6 +5,7 @@ import sys
 import time
 import socket
 import ipaddress
+from datetime import datetime
 
 # Bibliotecas prompt_toolkit para interface amigável no terminal
 from prompt_toolkit import PromptSession, print_formatted_text, HTML
@@ -45,7 +46,7 @@ cores_disponiveis = {
     "preto": "ansibrightblack",
     "vermelho": "ansibrightred",
     "verde": "ansibrightgreen",
-    "laranja": "ansibrightyellow",
+    "amarelo": "ansibrightyellow",
     "azul": "ansibrightblue",
     "magenta": "ansibrightmagenta",
     "ciano": "ansibrightcyan",
@@ -54,6 +55,12 @@ cores_disponiveis = {
 
 itens_coloridos = [f'<{cores_disponiveis[c]}>{c}</{cores_disponiveis[c]}>' for c in cores_disponiveis]
 texto_colorido = ", ".join(itens_coloridos)
+
+# --- Função para registrar logs ---
+def registrar_log(evento):
+    horario = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    with open("chat_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{horario}] {evento}\n")
 
 # --- Função que escuta as mensagens multicast ---
 def ouvir_multicast():
@@ -103,7 +110,7 @@ def enviar_multicast():
               message = session.prompt("> ")
 
             if message.lower() == 'sair':
-              enviar_mensagem("SAIR", sock, f"{NODE_ID}:{NODE_NAME}")
+              enviar_mensagem("SAIR", sock)
               print(f"Encerrando Chat...")
               stop_event.set()
               break
@@ -169,6 +176,10 @@ def tratar_mensagem(msg, sock):
         tipo,id_no,nome_no,cor,conteudo = msg.split(":", 4)
         no_id = int(id_no.strip())
 
+        if NODE_ID == COORDENADOR[0] and tipo not in ["BATIMENTO", "NOVA_LISTA", "BUSCA_COORDENADOR"]:
+            write_log = f"{tipo}: {nome_no} (ID: {no_id}): {conteudo}"
+            registrar_log(write_log)
+
         if no_id == NODE_ID:
             return
         if tipo == "BUSCA_COORDENADOR" and (COORDENADOR and COORDENADOR[0] == NODE_ID):
@@ -176,7 +187,8 @@ def tratar_mensagem(msg, sock):
                 novo_id = random.randint(2, 10000)
                 if all(n[0] != novo_id for n in LISTA_NOS) and novo_id != NODE_ID:
                     break
-
+            
+            registrar_log(f"{tipo}: {nome_no} (ID Temporário: {no_id})")
             resposta = f"ADD_NO:{NODE_ID}:{NODE_NAME}:{cor}:{novo_id},{no_id}:"
             LISTA_NOS.append((novo_id, nome_no))
             sock.sendto(resposta.encode('utf-8'), (MULTICAST_GROUP, PORT))
@@ -190,6 +202,8 @@ def tratar_mensagem(msg, sock):
         
         elif tipo == "ELEICAO":
             # Se recebi uma eleição e meu ID é maior -> respondo
+            write_log = f"ELEICAO: Iniciada por {nome_no} (ID: {no_id})"
+            registrar_log(write_log)
             if NODE_ID > int(id_no):
                 enviar_mensagem("ELEICAO_RESP", sock, "")
             return
@@ -294,6 +308,11 @@ def buscar_coordenador(sock):
         LISTA_NOS.append((NODE_ID, NODE_NAME))
 
         ULTIMO_BATIMENTO = time.time()
+        with open("chat_log.txt", "a", encoding="utf-8") as f:
+            horario = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            f.write(f"\n--- Inicializando Chat [{horario}] ---\n")
+        registrar_log(f"Coordenador Inicial: {NODE_NAME} (ID: {NODE_ID})")
+
         # Envia 3 batimentos imediatos para "anunciar" com redundância
         for _ in range(3):                
             enviar_mensagem("BATIMENTO", sock, "")
