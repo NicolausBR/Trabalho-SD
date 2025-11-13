@@ -5,6 +5,7 @@ import sys
 import time
 import socket
 import ipaddress
+import os
 from datetime import datetime
 
 # Bibliotecas prompt_toolkit para interface amigável no terminal
@@ -59,7 +60,7 @@ texto_colorido = ", ".join(itens_coloridos)
 # --- Função para registrar logs ---
 def registrar_log(evento):
     horario = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    with open("chat_log.txt", "a", encoding="utf-8") as f:
+    with open(f"logs/chat_log_{MULTICAST_GROUP}.txt", "a", encoding="utf-8") as f:
         f.write(f"[{horario}] {evento}\n")
 
 # --- Função que escuta as mensagens multicast ---
@@ -308,9 +309,9 @@ def buscar_coordenador(sock):
         LISTA_NOS.append((NODE_ID, NODE_NAME))
 
         ULTIMO_BATIMENTO = time.time()
-        with open("chat_log.txt", "a", encoding="utf-8") as f:
+        with open(f"logs/chat_log_{MULTICAST_GROUP}.txt", "a", encoding="utf-8") as f:
             horario = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            f.write(f"\n--- Inicializando Chat [{horario}] ---\n")
+            f.write(f"\n--- Inicializando Chat de IP {MULTICAST_GROUP} [{horario}] ---\n")
         registrar_log(f"Coordenador Inicial: {NODE_NAME} (ID: {NODE_ID})")
 
         # Envia 3 batimentos imediatos para "anunciar" com redundância
@@ -383,6 +384,9 @@ def validar_ip_multicast(ip_str):
 def chat():
     try:
         global NODE_NAME, NODE_COLOR, MULTICAST_GROUP
+        
+        # Cria diretório de logs se não existir (não envia para o git)
+        os.makedirs("logs", exist_ok=True)
 
         NODE_NAME = input("Digite seu nome: ")
         print_formatted_text(HTML(f"Cores disponíveis: {texto_colorido}"))
