@@ -105,18 +105,18 @@ def enviar_multicast():
       ttl = struct.pack('b', 1)
       sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
-      print('Digite a mensagem ("sair" para encerrar, "lista" para ver nós conectados caso seja coordenador):')
+      print('Digite a mensagem ("/sair" para encerrar, "/lista" para ver nós conectados caso seja coordenador):')
       while not stop_event.is_set():
             with patch_stdout():
               message = session.prompt("> ")
 
-            if message.lower() == 'sair':
+            if message.lower() == '/sair':
               enviar_mensagem("SAIR", sock)
               print(f"Encerrando Chat...")
               stop_event.set()
               break
 
-            elif message.lower() == 'lista':
+            elif message.lower() == '/lista':
                 if COORDENADOR and COORDENADOR[0] != NODE_ID:
                     with patch_stdout():
                         print_formatted_text(HTML("<ansiyellow>Somente o coordenador pode exibir a lista de nós.</ansiyellow>"))
